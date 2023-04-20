@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenX Task 2</title>
+</head>
+
+<body>
+  <div class="container">
+    <h1 class="title">OpenX Task 2</h1>
+    <div class="available-products"></div>
+    <div class="highest-value-cart"></div>
+    <div class="furthest-users"></div>
+  </div>
+
+
+  <script>
+    const usersURL = "https://fakestoreapi.com/users";
+    const cartsURL = "https://fakestoreapi.com/carts/?startdate=2000-01-01&enddate=2023-04-07";
+    const productsURL = "https://fakestoreapi.com/products";
+
+    const getData = async (url) => {
+      const response = await fetch(url);
+      const data = await response.json();
+      return data;
+    };
+
+    //Haversine formula - calculate the shortest distance over the earth’s surface
+    const haversine = (lat1, lon1, lat2, lon2) => {
+      const R = 6371; // Earth's radius in kilometers
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const d = R * c; // distance in kilometers
+      return d;
+    };
+
+    const getAvailableProducts = (productsData) => {
+      const availableProducts = {};
+
+      productsData.forEach((product) => {
+        if (!availableProducts[product.category]) {
+          availableProducts[product.category] = product.price;
+        } else {
+          availableProducts[product.category] += product.price;
+        }
+      });
+
+      return availableProducts;
+    }
+
+    const getHighestValueCart = (cartsData, productsData, usersData) => {
+      let highestValueCart;
+      let highestValue = 0;
+
+      cartsData.forEach((cart) => {
+        let cartValue = cart.products.reduce((value, product) => {
+          const productPrice = productsData.find((item) => item.id === product.productId).price;
+          return value + productPrice * product.quantity;
+        }, 0);
+
+        if (cartValue > highestValue) {
+          highestValue = cartValue;
+          highestValueCart = cart;
+        }
+      });
+
+      const highestValueCartOwner = usersData.find((user) => user.id === highestValueCart.userId);
+
+      return { cart: highestValueCart, value: highestValue, owner: highestValueCartOwner };
+    }
+
+    const findFurthestUsers = (usersData) => {
+      let furthestUsers = null;
+      let maxDistance = 0;
+      for (let i = 0; i < usersData.length - 1; i++) {
+        const firstUser = usersData[i];
+        for (let j = i + 1; j < usersData.length; j++) {
+          const secondUser = usersData[j];
+          const distance = haversine(
+            firstUser.address.geolocation.lat,
+            firstUser.address.geolocation.long,
+            secondUser.address.geolocation.lat,
+            secondUser.address.geolocation.long
+          );
+
+          if (distance > maxDistance) {
+            maxDistance = distance;
+            furthestUsers = [firstUser, secondUser];
+          }
+        }
+      }
+      return furthestUsers;
+    }
+
+    const displayAvaliableProducts = (availableProducts) => {
+      let categories = "<h2> Avaliable products and their total value </h2> ";
+
+      Object.keys(availableProducts).forEach(category => {
+        categories += "<b>" + category + "</b> Value: " + availableProducts[category] + "<br>";
+      })
+
+      document.getElementsByClassName("available-products")[0].innerHTML = categories;
+    }
+
+    const displayHighestValueCart = (highestValueCart) => {
+      document.getElementsByClassName("highest-value-cart")[0].innerHTML =
+        "<h2>Cart with the highest value</h2> <br> Id: " + highestValueCart.cart.id +
+        "<br> Value: " + highestValueCart.value +
+        "<br> Owner: " + highestValueCart.owner.name.firstname + " " + highestValueCart.owner.name.lastname;
+    }
+
+    const displayFurthestUsers = (furthestUsers) => {
+      document.getElementsByClassName("furthest-users")[0].innerHTML =
+        "<h2>Two users living furthest away from each other</h2> <br>" +
+        furthestUsers[0].name.firstname + " " + furthestUsers[0].name.lastname + " and "
+        + furthestUsers[1].name.firstname + " " + furthestUsers[1].name.lastname;
+    }
+
+
+    const main = async () => {
+      //1. Retrieves user, product and shopping cart data
+      const productsData = await getData(productsURL);
+      const cartsData = await getData(cartsURL);
+      const usersData = await getData(usersURL);
+
+      //2. Creates a data structure containing all available product categories and the total value of products of a given category
+
+      const availableProducts = getAvailableProducts(productsData);
+      displayAvaliableProducts(availableProducts)
+
+      //3. Finds a cart with the highest value, determines its value and full name of its owner
+
+      const highestValueCart = getHighestValueCart(cartsData, productsData, usersData);
+      displayHighestValueCart(highestValueCart);
+
+      //4. Finds the two users living furthest away from each other
+
+      const furthestUsers = findFurthestUsers(usersData);
+      displayFurthestUsers(furthestUsers);
+    };
+
+    main();
+
+  </script>
+</body>
+
+</html>
